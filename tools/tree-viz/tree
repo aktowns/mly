@@ -1,0 +1,47 @@
+#!/usr/bin/env ruby
+
+require 'nokogiri'
+require 'graphviz'
+
+def render g, node, parent=nil
+  typ = node[:type]
+  is_node = node[:kind] == "node"
+  is_value = node[:kind] == "value"
+  is_list = node[:kind] == "list"
+  is_text = node.name == "text"
+
+  if is_text
+    gnode = g.add_nodes(node.text + node.hash.to_s, label: node.text, shape: 'none', :fontsize => '18', :fontname => "iosevka")
+  elsif is_node
+    gnode = g.add_nodes(node.name + node.hash.to_s, label: "<#{node.name}<BR /><FONT COLOR=\"#da573b\" POINT-SIZE=\"12\">#{typ.gsub(/>/,'&gt;')}</FONT>>", :fontname => "iosevka", :color => "dimgray", :fontcolor => "indigo")
+  elsif is_value
+    gnode = g.add_nodes(node.name + node.hash.to_s, label: node.name, :fontname => "iosevka", :color => "dimgray", :fontcolor => "indigo", :shape => 'square')
+  elsif is_list
+    gnode = g.add_nodes(node.name + node.hash.to_s, label: node.name)
+  else
+    gnode = parent
+  end
+
+  #if is_text
+  #  g.add_edges(parent, gnode, :color => 'steelblue') unless parent.nil?
+  #end
+
+  node.children.each do |child|
+    n = render g, child, gnode
+    unless (is_node || is_value || is_list) 
+      g.add_edges(parent, n, label: " #{node.name} ", :fontcolor => "forestgreen", :color => 'dimgray') unless parent.nil? || n.nil?
+    end
+  end
+  gnode
+end
+
+g = GraphViz.new(:G, :type => :digraph, :fontname => 'iosevka', :label => "#{ARGV[0]} tree graph")
+File.open(ARGV[0]) do |fp|
+  o = Nokogiri::XML.parse(fp.read)
+  o.children.each do |child| 
+    render g, child
+  end
+end
+
+g.output(:png => "tree.png")
+
